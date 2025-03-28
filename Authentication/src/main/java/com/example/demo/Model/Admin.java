@@ -16,9 +16,15 @@ public class Admin {
     @Column(nullable = false)
     private String password;
 
-    @Enumerated(EnumType.STRING)  // ✅ This ensures role is stored as "MAJOR_ADMIN" or "MINOR_ADMIN"
+    @Enumerated(EnumType.STRING)  
     @Column(nullable = false)
-    private Role role;  // ✅ Use the correct custom Enum, NOT javax.management.relation.Role
+    private Role role;
+
+    @Column(nullable = false)
+    private boolean requestedPrivilege = false;  // ✅ Tracks if Minor Admin requested privileges
+
+    @Column(nullable = false)
+    private boolean privilegeGranted = false;  // ✅ Tracks if Major Admin approved privileges
 
     // Constructors
     public Admin() {}
@@ -27,6 +33,8 @@ public class Admin {
         this.username = username;
         this.password = password;
         this.role = role;
+        this.requestedPrivilege = false;
+        this.privilegeGranted = false;
     }
 
     // Getters and Setters
@@ -61,6 +69,23 @@ public class Admin {
     public void setRole(Role role) {
         this.role = role;
     }
+
+    public boolean isRequestedPrivilege() {
+        return requestedPrivilege;
+    }
+
+    public void setRequestedPrivilege(boolean requestedPrivilege) {
+        this.requestedPrivilege = requestedPrivilege;
+    }
+
+    public boolean isPrivilegeGranted() {
+        return privilegeGranted;
+    }
+
+    public void setPrivilegeGranted(boolean privilegeGranted) {
+        this.privilegeGranted = privilegeGranted;
+    }
 }
+
 
 
