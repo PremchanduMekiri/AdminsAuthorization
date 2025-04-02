@@ -2,16 +2,25 @@ package com.example.demo.controller;
 
 import com.example.demo.Model.Admin;
 import com.example.demo.Model.Privilege;
+import com.example.demo.Model.PrivilegeRequestDto;
+import com.example.demo.Model.Role;
 import com.example.demo.Repository.AdminRepository;
+import com.example.demo.Repository.PrivilegeRepository;
 import com.example.demo.service.PrivilegeService;
-
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import jakarta.validation.Valid;  // ✅ Newer versions (Spring Boot 3+)
 
+
+
+import java.sql.Date;
+import java.util.Map;
 import java.util.Optional;
 
 @RestController
@@ -23,70 +32,59 @@ public class PrivilegeController {
 
     @Autowired
     private AdminRepository adminRepository;
+    
+    @Autowired
+    private PrivilegeRepository privilegerepo;
+    
 
+    @Autowired
+    private PasswordEncoder passwordEncoder; 
 
+    @PostMapping("/request")
+    public ResponseEntity<String> requestPrivileges(@RequestBody PrivilegeRequestDto request) {
+        System.out.println("🔥 requestPrivileges endpoint hit!");
 
-        @PostMapping("/request")
-        public ResponseEntity<String> requestPrivileges() {
-            // 🔹 Get the currently authenticated user
-            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            
-            if (authentication == null || !authentication.isAuthenticated()) {
-                return ResponseEntity.status(403).body("❌ Unauthorized request.");
-            }
-
-            // 🔹 Check if user has ROLE_MINOR_ADMIN
-            boolean isMinorAdmin = authentication.getAuthorities().stream()
-                    .map(GrantedAuthority::getAuthority)
-                    .anyMatch(role -> role.equals("ROLE_MINOR_ADMIN"));
-
-            if (!isMinorAdmin) {
-                return ResponseEntity.status(403).body("❌ Only Minor Admins can request privileges.");
-            }
-
-            // 🔹 Find the Minor Admin in the database
-            String username = authentication.getName();
-            Admin minorAdmin = adminRepository.findByUsername(username)
-                    .orElseThrow(() -> new RuntimeException("❌ Admin not found."));
-
-            // 🔹 Process privilege request
-            privilegeService.requestPrivileges(minorAdmin.getId());
-            
-            return ResponseEntity.ok("✅ Privilege request sent to Major Admin.");
+        if (request.getUsername() == null || request.getPassword() == null) {
+            return ResponseEntity.badRequest().body("❌ Missing username or password.");
         }
+
+        // Authenticate Minor Admin
+        Optional<Admin> optionalAdmin = adminRepository.findByUsername(request.getUsername());
+        if (optionalAdmin.isEmpty()) {
+            return ResponseEntity.status(401).body("❌ User not found.");
+        }
+
+        Admin admin = optionalAdmin.get();
+        if (!passwordEncoder.matches(request.getPassword(), admin.getPassword())) {
+            return ResponseEntity.status(401).body("❌ Invalid credentials.");
+        }
+
+        // Check if the user is a Minor Admin
+        if (admin.getRole() != Role.MINOR_ADMIN) {
+            return ResponseEntity.status(403).body("❌ Only Minor Admins can request privileges.");
+        }
+
+        // Request Privileges
+        privilegeService.requestPrivileges(admin.getId());
+
+        return ResponseEntity.ok("✅ Privilege request submitted.");
+    }
+
     
 
 
-    // 🔹 Major Admin approves the privilege request
     @PostMapping("/approve")
     public ResponseEntity<String> approvePrivilegeRequest(@RequestParam Long minorAdminId) {
         String token = privilegeService.approvePrivilegeRequest(minorAdminId);
         return ResponseEntity.ok("Privilege request approved! Token: " + token);
     }
 
-    // 🔹 Major Admin grants privileges to Minor Admin directly
-    @PostMapping("/grant")
-    public ResponseEntity<String> grantPrivileges(@RequestParam Long minorAdminId) {
-        String token = privilegeService.grantPrivileges(minorAdminId);
-        return ResponseEntity.ok("Privilege granted successfully! Token: " + token);
-    }
 
-    // 🔹 Get privileges of a Minor Admin
-    @GetMapping("/get")
-    public ResponseEntity<Optional<Privilege>> getPrivilege(@RequestParam Long minorAdminId) {
-        return ResponseEntity.ok(privilegeService.getPrivilege(minorAdminId));
-    }
-
-    // 🔹 Major Admin revokes Minor Admin's privileges
     @DeleteMapping("/revoke")
     public ResponseEntity<String> revokePrivileges(@RequestParam Long minorAdminId) {
-        privilegeService.revokePrivileges(minorAdminId);
+        privilegeService.requestPrivileges(minorAdminId);
         return ResponseEntity.ok("Privilege revoked successfully!");
     }
-    @GetMapping("/test-auth")
-    public ResponseEntity<String> testAuth() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        return ResponseEntity.ok("User: " + authentication.getName() + ", Roles: " + authentication.getAuthorities());
-    }
 }
+
 

@@ -4,14 +4,14 @@ import com.example.demo.Model.Admin;
 import com.example.demo.Model.Privilege;
 import com.example.demo.Repository.AdminRepository;
 import com.example.demo.Repository.PrivilegeRepository;
-
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Date;
+import java.time.LocalDateTime;
 import java.util.Optional;
+import java.util.UUID;
+import java.util.*;
 
 @Service
 public class PrivilegeService {
@@ -22,82 +22,62 @@ public class PrivilegeService {
     @Autowired
     private AdminRepository adminRepository;
 
-    // 🔹 Minor Admin requests privileges from Major Admin
+    // 🔹 Minor Admin Requests Privilege (No Token Yet)
     public void requestPrivileges(Long minorAdminId) {
         Admin minorAdmin = adminRepository.findById(minorAdminId)
-                .orElseThrow(() -> new RuntimeException("Minor Admin not found"));
+                .orElseThrow(() -> new RuntimeException("❌ Minor Admin not found"));
 
-        // ✅ Create a pending privilege request
-        Privilege privilegeRequest = new Privilege(minorAdmin, null, null); // No token yet
-        privilegeRepository.save(privilegeRequest);
+        Optional<Privilege> existingRequest = privilegeRepository.findByMinorAdminId(minorAdminId);
+        if (existingRequest.isPresent()) {
+            throw new RuntimeException("❌ Privilege request already exists.");
+        }
+
+        Privilege privilege = new Privilege();
+        privilege.setMinorAdmin(minorAdmin); // ✅ Associate Minor Admin correctly
+        privilege.setExpirationTime(null); // ⛔ No token yet, awaiting approval
+
+        privilegeRepository.save(privilege);
+        System.out.println("✅ Privilege request recorded.");
     }
 
-    // 🔹 Major Admin approves the privilege request and generates a token
+    // 🔹 Major Admin Approves Privilege (Token is Created)
     public String approvePrivilegeRequest(Long minorAdminId) {
         Admin minorAdmin = adminRepository.findById(minorAdminId)
-                .orElseThrow(() -> new RuntimeException("Minor Admin not found"));
+                .orElseThrow(() -> new RuntimeException("❌ Minor Admin not found"));
 
-        // Check if a request exists
-        Optional<Privilege> existingRequest = privilegeRepository.findByAdminId(minorAdminId);
-
+        Optional<Privilege> existingRequest = privilegeRepository.findByMinorAdminId(minorAdminId);
         if (existingRequest.isEmpty()) {
-            throw new RuntimeException("No pending privilege request found.");
+            throw new RuntimeException("❌ No pending privilege request found.");
         }
 
-        // Generate a new JWT token valid for 2 hours
-        String token = JwtUtil.generateToken(minorAdmin.getUsername(), "MINOR_ADMIN", 2 * 60 * 60 * 1000);
-        Date expirationTime = new Date(System.currentTimeMillis() + 2 * 60 * 60 * 1000);
-
-        // ✅ Update privilege details in the database
         Privilege privilege = existingRequest.get();
+        String token = UUID.randomUUID().toString();
         privilege.setToken(token);
-        privilege.setExpirationTime(expirationTime);
+        privilege.setExpirationTime(LocalDateTime.now().plusHours(2)); // ✅ Token valid for 2 hours
+
         privilegeRepository.save(privilege);
+        System.out.println("✅ Token generated and saved: " + token);
 
         return token;
     }
 
-    // 🔹 Major Admin grants privilege directly (without request)
-    public String grantPrivileges(Long minorAdminId) {
-        Admin minorAdmin = adminRepository.findById(minorAdminId)
-                .orElseThrow(() -> new RuntimeException("Minor Admin not found"));
+    // 🔹 Validate Token for Minor Admin
+    public boolean validateToken(Long minorAdminId, String token) {
+        Optional<Privilege> privilegeOpt = privilegeRepository.findByMinorAdminId(minorAdminId);
 
-        // Check for existing privileges
-        Optional<Privilege> existingPrivilege = privilegeRepository.findByAdminId(minorAdminId);
-
-        if (existingPrivilege.isPresent()) {
-            // If token is expired, delete old privilege
-            if (existingPrivilege.get().getExpirationTime().before(new Date())) {
-                privilegeRepository.delete(existingPrivilege.get());
-            } else {
-                // ✅ Return the existing valid token instead of generating a new one
-                return existingPrivilege.get().getToken();
-            }
+        if (privilegeOpt.isEmpty()) {
+            return false; // ❌ No privilege found
         }
+        Privilege privilege = privilegeOpt.orElseThrow(() -> new RuntimeException("❌ No privilege found."));
 
-        // Generate a new JWT token valid for 2 hours
-        String token = JwtUtil.generateToken(minorAdmin.getUsername(), "MINOR_ADMIN", 2 * 60 * 60 * 1000);
-        Date expirationTime = new Date(System.currentTimeMillis() + 2 * 60 * 60 * 1000);
-
-        // Save privilege details in the database
-        Privilege privilege = new Privilege(minorAdmin, token, expirationTime);
-        privilegeRepository.save(privilege);
-
-        return token;
-    }
-
-    // 🔹 Get Privilege by Minor Admin ID
-    public Optional<Privilege> getPrivilege(Long minorAdminId) {
-        return privilegeRepository.findByAdminId(minorAdminId)
-                .filter(privilege -> privilege.getExpirationTime().after(new Date())); // ✅ Ensure it's not expired
-    }
-
-    // 🔹 Revoke Privileges (if needed)
-    @Transactional
-    public void revokePrivileges(Long minorAdminId) {
-        privilegeRepository.findByAdminId(minorAdminId).ifPresent(privilegeRepository::delete);
+        return privilege.getToken() != null &&
+               privilege.getToken().equals(token) &&
+               privilege.isPrivilegeValid();
     }
 }
+
+
+
 
 
 

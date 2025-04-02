@@ -1,10 +1,12 @@
 package com.example.demo.Model;
 
 import jakarta.persistence.*;
-import java.util.Date;
+import lombok.Data;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "privileges")
+@Data
 public class Privilege {
 
     @Id
@@ -15,61 +17,16 @@ public class Privilege {
     @JoinColumn(name = "minor_admin_id", nullable = false)
     private Admin minorAdmin;
 
-    @Column(nullable = false, unique = true)
+    @Column(unique = true)
     private String token;
 
-    @Temporal(TemporalType.TIMESTAMP)
-    @Column(nullable = false)
-    private Date expirationTime;
+    @Column
+    private LocalDateTime expirationTime; // ✅ Can be NULL before approval
 
-    public Privilege() {}
-
-    public Privilege(Admin minorAdmin, String token, Date expirationTime) {
-        this.minorAdmin = minorAdmin;
-        this.token = token;
-        this.expirationTime = expirationTime;
-    }
-
-    // Getters and Setters
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public Admin getMinorAdmin() {
-        return minorAdmin;
-    }
-
-    public void setMinorAdmin(Admin minorAdmin) {
-        this.minorAdmin = minorAdmin;
-    }
-
-    public String getToken() {
-        return token;
-    }
-
-    public void setToken(String token) {
-        this.token = token;
-    }
-
-    public Date getExpirationTime() {
-        return expirationTime;
-    }
-
-    public void setExpirationTime(Date expirationTime) {
-        this.expirationTime = expirationTime;
-    }
-
-    // Helper method to check if the privilege is still valid
+    // ✅ Check if the privilege is still valid
     public boolean isPrivilegeValid() {
-        return expirationTime.after(new Date());
-    }
-
-    public void setPrivilegeName(String privilegeName) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'setPrivilegeName'");
+        return expirationTime != null && expirationTime.isAfter(LocalDateTime.now());
     }
 }
+
+
