@@ -67,4 +67,9 @@ public class Privilege {
     public boolean isPrivilegeValid() {
         return expirationTime.after(new Date());
     }
+
+    public void setPrivilegeName(String privilegeName) {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'setPrivilegeName'");
+    }
 }

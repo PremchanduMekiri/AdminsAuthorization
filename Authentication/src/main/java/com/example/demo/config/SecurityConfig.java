@@ -16,27 +16,27 @@ public class SecurityConfig {
 
     @Bean
     public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();  // ✅ Only one bean definition
+        return new BCryptPasswordEncoder();
     }
-
-    @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        http.csrf().disable()
-            .authorizeRequests()
-            .requestMatchers("/api/auth/login").permitAll()  // ✅ Allow login without authentication
-            .requestMatchers("/api/privileges/request").hasAuthority("MINOR_ADMIN") // ✅ Only authenticated Minor Admins can request privileges
-            .requestMatchers("/api/privileges/grant", "/api/privileges/approve", "/api/privileges/revoke").hasAuthority("MAJOR_ADMIN") // ✅ Major Admin controls privileges
-            .anyRequest().authenticated() // 🔐 All other endpoints require authentication
-            .and()
-            .httpBasic(); // ✅ Enable basic authentication (username/password in each request)
-
-        return http.build();
-    }
-
 
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration) throws Exception {
         return authenticationConfiguration.getAuthenticationManager();
     }
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http.csrf().disable()
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/api/auth/login").permitAll()
+                        .requestMatchers("/api/auth/logout").authenticated()
+                        .requestMatchers("/api/privileges/**").hasAnyRole("MAJOR_ADMIN", "MINOR_ADMIN")
+                        .anyRequest().authenticated()
+                )
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
+
+        return http.build();
+    }
 }
+
 
