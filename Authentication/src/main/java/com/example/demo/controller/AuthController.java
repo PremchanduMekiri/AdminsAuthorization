@@ -35,27 +35,24 @@ public class AuthController {
             return ResponseEntity.status(401).body("❌ Invalid credentials");
         }
 
-        // ✅ Major Admins bypass privilege checks
         if (admin.getRole() == Role.MAJOR_ADMIN) {
             return ResponseEntity.ok("✅ Major Admin authenticated successfully.");
         }
 
-        // ✅ Fetch privilege for this Minor Admin
+        // For Minor Admins, check for an approved privilege with a valid token
         Optional<Privilege> privilegeOpt = privilegeRepository.findByMinorAdminId(admin.getId());
-        
-        if (privilegeOpt.isEmpty()) {
-            return ResponseEntity.ok("⚠️ Login successful, but you need privilege approval from Major Admin.");
+        if (privilegeOpt.isPresent()) {
+            Privilege privilege = privilegeOpt.get();
+            if (privilege.getToken() != null && privilege.getExpirationTime().isAfter(LocalDateTime.now())) {
+                return ResponseEntity.ok("✅ Login successful! Use this token: " + privilege.getToken());
+            } else {
+                return ResponseEntity.status(403).body("❌ Privilege token expired or not granted. Request approval.");
+            }
         }
 
-        Privilege privilege = privilegeOpt.get();
-
-        // ✅ Check if privilege is still valid
-        if (privilege.getExpirationTime() != null && privilege.getExpirationTime().isAfter(LocalDateTime.now())) {
-            return ResponseEntity.ok("✅ Login successful! Use this token: " + privilege.getToken());
-        }
-
-        return ResponseEntity.status(403).body("❌ Login failed. Privilege token expired. Request approval again.");
+        return ResponseEntity.status(403).body("❌ No privilege found. Request approval from Major Admin.");
     }
+
 
 }
 

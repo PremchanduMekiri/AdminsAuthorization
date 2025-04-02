@@ -33,14 +33,14 @@ public class PrivilegeService {
         }
 
         Privilege privilege = new Privilege();
-        privilege.setMinorAdmin(minorAdmin); // ✅ Associate Minor Admin correctly
-        privilege.setExpirationTime(null); // ⛔ No token yet, awaiting approval
+        privilege.setMinorAdmin(minorAdmin);
+        privilege.setExpirationTime(null); // No token yet, awaiting approval
 
         privilegeRepository.save(privilege);
         System.out.println("✅ Privilege request recorded.");
     }
 
-    // 🔹 Major Admin Approves Privilege (Token is Created)
+
     public String approvePrivilegeRequest(Long minorAdminId) {
         Admin minorAdmin = adminRepository.findById(minorAdminId)
                 .orElseThrow(() -> new RuntimeException("❌ Minor Admin not found"));
@@ -51,14 +51,12 @@ public class PrivilegeService {
         }
 
         Privilege privilege = existingRequest.get();
-        String token = UUID.randomUUID().toString();
+        String token = UUID.randomUUID().toString(); // Generate a unique token
         privilege.setToken(token);
-        privilege.setExpirationTime(LocalDateTime.now().plusHours(2)); // ✅ Token valid for 2 hours
+        privilege.setExpirationTime(LocalDateTime.now().plusHours(2)); // Set token validity
 
         privilegeRepository.save(privilege);
-        System.out.println("✅ Token generated and saved: " + token);
-
-        return token;
+        return token; // Return the generated token
     }
 
     // 🔹 Validate Token for Minor Admin
@@ -66,14 +64,15 @@ public class PrivilegeService {
         Optional<Privilege> privilegeOpt = privilegeRepository.findByMinorAdminId(minorAdminId);
 
         if (privilegeOpt.isEmpty()) {
-            return false; // ❌ No privilege found
+            return false; // No privilege found
         }
-        Privilege privilege = privilegeOpt.orElseThrow(() -> new RuntimeException("❌ No privilege found."));
 
+        Privilege privilege = privilegeOpt.get();
         return privilege.getToken() != null &&
                privilege.getToken().equals(token) &&
-               privilege.isPrivilegeValid();
+               privilege.getExpirationTime().isAfter(LocalDateTime.now());
     }
+
 }
 
 

@@ -36,21 +36,18 @@ public class SecurityConfig {
 
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        http
-            .csrf(csrf -> csrf.disable())
-            .cors(cors -> cors.configurationSource(corsConfigurationSource())) // ✅ CORS enabled
-            .authorizeHttpRequests(auth -> auth
+    protected void configure(HttpSecurity http) throws Exception {
+        http.csrf().disable()
+            .authorizeRequests()
                 .requestMatchers("/api/auth/login").permitAll()
-                .requestMatchers("/api/privileges/request").hasAuthority("ROLE_MINOR_ADMIN") // ✅ Require Minor Admin role
-                .requestMatchers("/api/privileges/approve", "/api/privileges/revoke").hasAuthority("ROLE_MAJOR_ADMIN") // ✅ Major Admin only
+                .requestMatchers("/api/privileges/**").authenticated()
                 .anyRequest().authenticated()
-            )
-            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class); // ✅ Add JWT filter
-
-        return http.build();
+            .and()
+            .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+            .and()
+            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
     }
+
 
 
     @Bean
